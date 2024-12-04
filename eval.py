@@ -267,10 +267,6 @@ def evaluate(args_override):
                         distance = np.mean(action[:5, :3], axis=0) - agent.get_tcp_pose()[:3]
                         unit_distance = distance / np.linalg.norm(distance)
                         action[:, :3] = agent.get_tcp_pose()[:3] + unit_distance * 0.006
-                        # if np.mean(action[:5, 2]) < agent.get_tcp_pose()[2]:
-                        #     action[:, 2] = action[:, 2] - 0.01
-                        # else:
-                        #     action[:, 2] = action[:, 2] + 0.01                        
                         force_ensemble_buffer.add_action(action, t)
             
             # get step action from ensemble buffer
