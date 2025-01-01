@@ -61,7 +61,7 @@ class FoAR(nn.Module):
         self.classifier = MultimodalResNetBinaryClassifier(num_obs_force = num_obs_force)
         self.classifier_criterion = nn.BCELoss()
 
-    def forward(self, force_torque, color_list, cloud, actions=None, contact=None, batch_size=24):
+    def forward(self, force_torque, color, cloud, actions=None, contact=None, batch_size=24):
         src, pos, src_padding_mask = self.sparse_encoder(cloud, batch_size=batch_size)
         
         # Process sparse data
@@ -74,7 +74,7 @@ class FoAR(nn.Module):
         force_readout = force_readout[:, 0]
 
         force_torque = force_torque.view(batch_size, -1)
-        prop = self.classifier(color_list, force_torque)
+        prop = self.classifier(color, force_torque)
 
         weight = prop.expand(-1, force_readout.size(1))
 

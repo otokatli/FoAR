@@ -166,11 +166,11 @@ def train(args_override):
             cloud_feats = data['input_feats_list']
             force_data = data['input_force'] # normalized force data
             action_data = data['action_normalized']
-            cloud_feats, cloud_coords, action_data, force_data = cloud_feats.to(device), cloud_coords.to(device), action_data.to(device), force_data.to(device)
-            cloud_data = ME.SparseTensor(cloud_feats, cloud_coords)
-            color_list = data['image']
+            color = data['image']
             contact = data['contact']
-            loss_action, loss_cls = policy(force_data, color_list, cloud_data, action_data, contact = contact, batch_size = action_data.shape[0])
+            cloud_feats, cloud_coords, action_data, force_data, color, contact = cloud_feats.to(device), cloud_coords.to(device), action_data.to(device), force_data.to(device), color.to(device), contact.to(device)
+            cloud_data = ME.SparseTensor(cloud_feats, cloud_coords)
+            loss_action, loss_cls = policy(force_data, color, cloud_data, action_data, contact = contact, batch_size = action_data.shape[0])
             loss = loss_action + loss_cls * args.alpha
             # backward
             loss.backward()
