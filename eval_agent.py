@@ -10,8 +10,6 @@ from device.gripper.dahuan import DahuanModbusGripper
 from device.camera.realsense import RealSenseRGBDCamera
 from device.sensor.opto import OptoForceFTSensorWithHistory
 
-import threading
-
 class Agent:
     """
     Evaluation agent with Flexiv arm, Dahuan gripper and Intel RealSense RGB-D camera.
@@ -70,8 +68,29 @@ class Agent:
         colors, depths = self.camera.get_rgbd_image()
         return colors, depths
     
-    def get_force_torque(self):
+    def get_force_torque_history(self):
         return self.sensor.getHistory()
+
+    def get_force_torque(self):
+        return self.sensor.getHistory()[-1]
+
+    def get_force(self):
+        return self.sensor.getHistory()[-1, :3]
+    
+    def get_torque(self):
+        return self.sensor.getHistory()[-1, 3:]  
+    
+    def get_force_torque_value(self):
+        ft = self.get_force_torque()
+        return np.sqrt(np.sum(ft[:3] ** 2, axis = -1)), np.sqrt(np.sum(ft[3:] ** 2, axis = -1))
+    
+    def get_force_value(self):
+        force = self.get_force()
+        return np.sqrt(np.sum(force ** 2, axis = -1))
+
+    def get_torque_value(self):
+        torque = self.get_torque()
+        return np.sqrt(np.sum(torque ** 2, axis = -1))
     
     def get_tcp_pose(self):
         return self.robot.get_tcp_pose()

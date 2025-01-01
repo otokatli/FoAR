@@ -7,15 +7,15 @@ Ref:
   [3] NetFT, Cameron Devine, Github, availabale at https://github.com/CameronDevine/NetFT
 '''
 
-import os
 import time
 import socket
 import struct
 import threading
 import numpy as np
+
 from pynput import keyboard
+from collections import deque
 from multiprocessing import shared_memory
-from device.sensor.lowPassFilter import avgSmooth, lowPassFilter
 
 
 class EthernetFTSensor(object):
@@ -28,7 +28,6 @@ class EthernetFTSensor(object):
         scale = (1000, 1000),
         shm_name = None,
         show_info = True,
-        low_pass_flag = False,
         **kwargs
     ):
         '''
@@ -40,7 +39,6 @@ class EthernetFTSensor(object):
         scale: tuple of (int, int), default: (1000, 1000), the scaling coefficient of the force and torque values;
         shm_name: str, optional, default: None, the shared memory name of the force/torque data reading from the sensor;
         show_info: bool, optional, default: True, whether to show the detailed on the screen.
-        low_pass_flag: bool, optional, default: False, whether to use a low pass filtered measure function.
         '''
         super(EthernetFTSensor, self).__init__()
         self.ip = ip
@@ -52,10 +50,6 @@ class EthernetFTSensor(object):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.connect((self.ip, self.port))
         self.is_streaming = False
-        self.low_pass_flag = low_pass_flag
-        if self.low_pass_flag:
-            self.low_pass_buffer = np.zeros((6, 6))
-            self.low_pass_data = None
     
     def send(self, command, data):
         '''
@@ -192,9 +186,6 @@ class EthernetFTSensor(object):
             data = self.receive()
             if shm_flag:
                 self.shm_buf[:] = data[:]
-            if self.low_pass_flag:
-                # self.low_pass_data, self.low_pass_buffer = lowPassFilter(data, 2, 2*np.pi*50, 0.03, self.low_pass_buffer)
-                self.low_pass_data, self.low_pass_buffer = avgSmooth(data, self.low_pass_buffer)
 
     def stopStreaming(self, delay_time = 0.1):
         '''
@@ -265,10 +256,10 @@ class OptoForceFTSensor(EthernetFTSensor):
         scale = (10000, 100000),
         shm_name = 'force_torque',
         show_info = True,
-        low_pass_flag = False,
+        
         **kwargs
     ):
-        super(OptoForceFTSensor, self).__init__(ip, scale, shm_name, show_info, low_pass_flag, **kwargs)
+        super(OptoForceFTSensor, self).__init__(ip, scale, shm_name, show_info, **kwargs)
     
     def run(self, tare = True):
         '''
@@ -317,7 +308,6 @@ class OptoForceFTSensor(EthernetFTSensor):
     def _on_release(self, key):
         pass
 
-from collections import deque
 
 class OptoForceFTSensorWithHistory(OptoForceFTSensor):
     def __init__(
@@ -327,13 +317,12 @@ class OptoForceFTSensorWithHistory(OptoForceFTSensor):
         scale = (10000, 100000),
         shm_name = 'force_torque',
         show_info = True,
-        low_pass_flag = False,
         **kwargs
     ):
-        super(OptoForceFTSensorWithHistory, self).__init__(ip, scale, shm_name, show_info, low_pass_flag, **kwargs)
+        super(OptoForceFTSensorWithHistory, self).__init__(ip, scale, shm_name, show_info, **kwargs)
         
         initial_data = np.zeros(6)
-        self.history = deque([initial_data.copy() for _ in range(history_size)], maxlen=history_size)
+        self.history = deque([initial_data.copy() for _ in range(history_size)], maxlen = history_size)
     
     def receiveHandler(self):
         '''
@@ -347,8 +336,6 @@ class OptoForceFTSensorWithHistory(OptoForceFTSensor):
             data = self.receive()      
             if shm_flag:
                 self.shm_buf[:] = data[:]
-            if self.low_pass_flag:
-                self.low_pass_data, self.low_pass_buffer = avgSmooth(data, self.low_pass_buffer)
             
             self.history.append(data)
     

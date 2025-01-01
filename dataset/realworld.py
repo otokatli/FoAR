@@ -28,7 +28,8 @@ class RealWorldDataset(Dataset):
         num_obs_force = 100,
         num_action = 20, 
         num_action_force = 100,
-        force_threshold = 8,
+        demo_force_threshold = 8.0,
+        demo_torque_threshold = 5.0,
         voxel_size = 0.005,
         cam_ids = ['750612070851'],
         aug = False,
@@ -51,7 +52,8 @@ class RealWorldDataset(Dataset):
         self.num_action = num_action
         self.num_obs_force = num_obs_force
         self.num_action_force = num_action_force
-        self.force_threshold = force_threshold
+        self.demo_force_threshold = demo_force_threshold
+        self.demo_torque_threshold = demo_torque_threshold
         self.voxel_size = voxel_size
         self.aug = aug
         self.aug_trans_min = np.array(aug_trans_min)
@@ -346,15 +348,15 @@ class RealWorldDataset(Dataset):
             T.Normalize(mean = IMG_MEAN, std = IMG_STD)
         ])
         color_list_normalized = img_process(colors_list)
-        obs_force_value = np.sqrt(np.sum(obs_force_torque_list[:, :3]**2, axis = -1))
-        obs_torque_value = np.sqrt(np.sum(obs_force_torque_list[:, 3:]**2, axis = -1))
-        action_force_value = np.sqrt(np.sum(action_force_torque_list[:, :3]**2, axis = -1))
-        action_torque_value = np.sqrt(np.sum(action_force_torque_list[:, 3:]**2, axis = -1))
+        obs_force_value = np.sqrt(np.sum(obs_force_torque_list[:, :3] ** 2, axis = -1))
+        obs_torque_value = np.sqrt(np.sum(obs_force_torque_list[:, 3:] ** 2, axis = -1))
+        action_force_value = np.sqrt(np.sum(action_force_torque_list[:, :3] ** 2, axis = -1))
+        action_torque_value = np.sqrt(np.sum(action_force_torque_list[:, 3:] ** 2, axis = -1))
 
         # label by force threshold
-        is_cut = np.max(obs_force_value) > self.force_threshold or np.max(action_force_value) > self.force_threshold
-
-        is_cut = torch.tensor(is_cut, dtype=torch.float)
+        contact_force = np.max(obs_force_value) > self.demo_force_threshold or np.max(action_force_value) > self.demo_force_threshold
+        contact_torque = np.max(obs_torque_value) > self.demo_torque_threshold or np.max(action_torque_value) > self.demo_torque_threshold
+        contact = torch.tensor(contact_force | contact_torque, dtype = torch.bool)
 
         ret_dict = {
             'input_coords_list': input_coords_list,
@@ -364,7 +366,7 @@ class RealWorldDataset(Dataset):
 
             'input_frame_list': colors_list, # (..., 3, 720, 1280)
             'input_frame_list_normalized': color_list_normalized, # (..., 3, 224, 224)
-            'is_cut': is_cut,
+            'contact': contact,
 
             'action': actions,
             'action_normalized': actions_normalized,

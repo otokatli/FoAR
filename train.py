@@ -19,10 +19,14 @@ from utils.training import set_seed, plot_history, sync_loss
 
 
 default_args = edict({
-    "data_path": "data/collect_pens",
+    "data_path": "data/wiping",
     "aug": False,
     "aug_jitter": False,
+    "num_obs_force": 100,
     "num_action": 20,
+    "num_action_force": 100,
+    "demo_force_threshold": 8.0,
+    "demo_torque_threshold": 5.0,
     "voxel_size": 0.005,
     "obs_feature_dim": 512,
     "hidden_dim": 512,
@@ -31,7 +35,8 @@ default_args = edict({
     "num_decoder_layers": 1,
     "dim_feedforward": 2048,
     "dropout": 0.1,
-    "ckpt_dir": "logs/collect_pens",
+    "alpha": 10.0,
+    "ckpt_dir": "logs/wiping",
     "resume_ckpt": None,
     "resume_epoch": -1,
     "lr": 3e-4,
@@ -87,7 +92,8 @@ def train(args_override):
         num_obs_force = args.num_obs_force,
         num_action = args.num_action,
         num_action_force = args.num_action_force,
-        force_threshold=args.force_threshold,
+        force_threshold = args.demo_force_threshold,
+        torque_threshold = args.demo_torque_threshold,
         voxel_size = args.voxel_size,
         aug = args.aug,
         aug_jitter = args.aug_jitter, 
@@ -152,8 +158,6 @@ def train(args_override):
         num_steps = len(dataloader)
         pbar = tqdm(dataloader) if RANK == 0 else dataloader
         avg_loss = 0
-        avg_loss_classifier = 0
-        avg_loss_total = 0
 
         for data in pbar:
             # forward
@@ -164,9 +168,9 @@ def train(args_override):
             cloud_feats, cloud_coords, action_data, force_data = cloud_feats.to(device), cloud_coords.to(device), action_data.to(device), force_data.to(device)
             cloud_data = ME.SparseTensor(cloud_feats, cloud_coords)
             color_list = data['input_frame_list_normalized']
-            is_cut = data['is_cut']
-            loss_action, loss_cls = policy(force_data, color_list, cloud_data, action_data, is_cut=is_cut, batch_size = action_data.shape[0])
-            loss = loss_action + loss_cls * 10
+            contact = data['contact']
+            loss_action, loss_cls = policy(force_data, color_list, cloud_data, action_data, contact = contact, batch_size = action_data.shape[0])
+            loss = loss_action + loss_cls * args.alpha
             # backward
             loss.backward()
             optimizer.step()
@@ -199,10 +203,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', action = 'store', type = str, help = 'data path', required = True)
     parser.add_argument('--aug', action = 'store_true', help = 'whether to add 3D data augmentation')
     parser.add_argument('--aug_jitter', action = 'store_true', help = 'whether to add color jitter augmentation')
-    parser.add_argument('--num_obs_force', action= 'store', type= int, help='number of force observation steps', required=False, default= 100)
+    parser.add_argument('--num_obs_force', action= 'store', type= int, help='number of force observation steps', required=False, default = 100)
     parser.add_argument('--num_action', action = 'store', type = int, help = 'number of action steps', required = False, default = 20)
     parser.add_argument('--num_action_force', action = 'store', type = int, help = 'number of action force steps', required = False, default = 100)
-    parser.add_argument('--force_threshold', action = 'store', type = int, help = '', required = False, default = 8)
+    parser.add_argument('--demo_force_threshold', action = 'store', type = float, help = '', required = False, default = 8.0)
+    parser.add_argument('--demo_torque_threshold', action = 'store', type = float, help = '', required = False, default = 5.0)
     parser.add_argument('--voxel_size', action = 'store', type = float, help = 'voxel size', required = False, default = 0.005)
     parser.add_argument('--obs_feature_dim', action = 'store', type = int, help = 'observation feature dimension', required = False, default = 512)
     parser.add_argument('--hidden_dim', action = 'store', type = int, help = 'hidden dimension', required = False, default = 512)
@@ -211,6 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_decoder_layers', action = 'store', type = int, help = 'number of decoder layers', required = False, default = 1)
     parser.add_argument('--dim_feedforward', action = 'store', type = int, help = 'feedforward dimension', required = False, default = 2048)
     parser.add_argument('--dropout', action = 'store', type = float, help = 'dropout ratio', required = False, default = 0.1)
+    parser.add_argument('--alpha', action = 'store', type = float, help = 'weighting factor of loss', required = False, default = 10.0)
     parser.add_argument('--ckpt_dir', action = 'store', type = str, help = 'checkpoint directory', required = True)
     parser.add_argument('--resume_ckpt', action = 'store', type = str, help = 'resume checkpoint file', required = False, default = None)
     parser.add_argument('--resume_epoch', action = 'store', type = int, help = 'resume from which epoch', required = False, default = -1)

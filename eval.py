@@ -1,20 +1,12 @@
-import os
-import time
-import json
 import torch
 import argparse
 import numpy as np
 import open3d as o3d
-import torch.nn as nn
 import MinkowskiEngine as ME
-import matplotlib.pyplot as plt
-import torch.distributed as dist
 import torchvision.transforms as T
 
-from tqdm import tqdm
 from copy import deepcopy
 from easydict import EasyDict as edict
-from diffusers.optimization import get_cosine_schedule_with_warmup
 
 from policy import FoAR
 from eval_agent import Agent
@@ -26,12 +18,18 @@ from utils.ensemble import EnsembleBuffer
 from utils.transformation import rotation_transform
 
 
-
 default_args = edict({
     "ckpt": None,
     "calib": "calib/",
+    "crop_in_base": False,
     "num_action": 20,
     "num_inference_step": 20,
+    "num_obs_force": 100,
+    "num_motion_calc_steps": 5,
+    "cls_threshold": 0.9,
+    "force_threshold": 8.0,
+    "torque_threshold": 5.0,
+    "epsilon": 0.006,
     "voxel_size": 0.005,
     "obs_feature_dim": 512,
     "hidden_dim": 512,
@@ -43,7 +41,7 @@ default_args = edict({
     "max_steps": 300,
     "seed": 233,
     "vis": False,
-    "discretize_rotation": True,
+    "discretize_rotation": False,
     "ensemble_mode": "new"
 })
 
@@ -218,13 +216,13 @@ def evaluate(args_override):
                     depths,
                     cam_intrinsics = agent.intrinsics,
                     voxel_size = args.voxel_size,
-                    projector=projector,
-                    crop_in_base=args.crop_in_base
+                    projector = projector,
+                    crop_in_base = args.crop_in_base
                 )
                 feats, coords = feats.to(device), coords.to(device)
                 cloud_data = ME.SparseTensor(feats, coords)
                 tcp = agent.get_tcp_pose()
-                force_torque_base = agent.get_force_torque()
+                force_torque_base = agent.get_force_torque_history()
                 force_torque_cam = []
                 for i in range(args.num_obs_force):
                     force_torque_cam.append(projector.project_force_to_camera_coord(tcp, force_torque_base[i], cam="750612070851"))
@@ -233,17 +231,14 @@ def evaluate(args_override):
                 force_torque_normalized = torch.from_numpy(force_torque_normalized).float()
                 force_torque_normalized = force_torque_normalized.unsqueeze(0).to(device)
                 color_list = img_process(colors).unsqueeze(0).to(device)
-                print("Using FoAR policy...")
                 # FoAR
                 prop, pred_raw_action = force_policy(force_torque_normalized, color_list, cloud_data, actions = None,is_cut=None, batch_size = 1)
                 pred_raw_action = pred_raw_action.squeeze(0).cpu().numpy()
-                print("prop: ", prop)
 
                 # unnormalize predicted actions
                 action = unnormalize_action(pred_raw_action)
                 # visualization
                 if args.vis:
-                    import open3d as o3d
                     pcd = o3d.geometry.PointCloud()
                     pcd.points = o3d.utility.Vector3dVector(cloud[:, :3])
                     pcd.colors = o3d.utility.Vector3dVector(cloud[:, 3:] * IMG_STD + IMG_MEAN)
@@ -260,23 +255,20 @@ def evaluate(args_override):
                 # full actions
                 action = np.concatenate([action_tcp, action_width[..., np.newaxis]], axis = -1)
                 # add to ensemble buffer
-                if prop < 0.9:
+                if prop < args.cls_threshold:
                     ensemble_buffer.add_action(action, t)
                 else:
-                    if np.max(abs(agent.force())) < args.force_threshold: # force is smaller than the force threshold, reactive control
-                        distance = np.mean(action[:5, :3], axis=0) - agent.get_tcp_pose()[:3]
+                    cur_force_value, cur_torque_value = agent.get_force_torque_value()
+                    if cur_force_value < args.force_threshold and cur_torque_value < args.torque_threshold: # reactive control
+                        distance = np.mean(action[:args.num_motion_calc_steps, :3], axis=0) - agent.get_tcp_pose()[:3]
                         unit_distance = distance / np.linalg.norm(distance)
-                        action[:, :3] = agent.get_tcp_pose()[:3] + unit_distance * 0.006
+                        action[:, :3] = agent.get_tcp_pose()[:3] + unit_distance * args.epsilon
                         force_ensemble_buffer.add_action(action, t)
             
-            # get step action from ensemble buffer
-            pos_action = ensemble_buffer.get_action()
-            force_action = force_ensemble_buffer.get_action()
-            # print("current force: ", agent.force())
-            if prop < 0.9:
-                step_action = pos_action
+            if prop < args.cls_threshold:
+                step_action = ensemble_buffer.get_action()
             else:
-                step_action = force_action
+                step_action = force_ensemble_buffer.get_action()
                 
             if step_action is None:   # no action in the buffer => no movement.
                 continue
@@ -303,7 +295,6 @@ def evaluate(args_override):
                 )
             
             # send gripper width to gripper (thresholding to avoid repeating sending signals to gripper)
-            if step_width < 0.04: step_width=0
             if prev_width is None or abs(prev_width - step_width) > GRIPPER_THRESHOLD:
                 agent.set_gripper_width(step_width, blocking = True)
                 prev_width = step_width
@@ -316,11 +307,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ckpt', action = 'store', type = str, help = 'policy checkpoint path', required = True)
     parser.add_argument('--calib', action = 'store', type = str, help = 'calibration path', required = True)
-    parser.add_argument('--crop_in_base', action = 'store_true', help = '')
+    parser.add_argument('--crop_in_base', action = 'store_true', help = 'whether to crop point cloud in base coordinate')
     parser.add_argument('--num_action', action = 'store', type = int, help = 'number of action steps', required = False, default = 20)
     parser.add_argument('--num_inference_step', action = 'store', type = int, help = 'number of inference query steps', required = False, default = 20)
     parser.add_argument('--num_obs_force', action = 'store', type = int, help = 'width of force window', required = False, default = 100)
-    parser.add_argument('--force_threshold', action = 'store', type = int, help = 'force threshold', required = False, default = 8)
+    parser.add_argument('--num_motion_calc_steps', action = 'store', type = int, help = 'number of motion calculation steps', required = False, default = 5)
+    parser.add_argument('--cls_threshold', action = 'store', type = float, help = 'threshold for future contact probability', required = False, default = 0.9)
+    parser.add_argument('--force_threshold', action = 'store', type = float, help = 'force threshold', required = False, default = 8.0)
+    parser.add_argument('--torque_threshold', action = 'store', type = float, help = 'torque threshold', required = False, default = 5.0)
+    parser.add_argument('--epsilon', action = 'store', type = int, help = 'epsilon for reactive control', required = False, default = 0.006)
     parser.add_argument('--voxel_size', action = 'store', type = float, help = 'voxel size', required = False, default = 0.005)
     parser.add_argument('--obs_feature_dim', action = 'store', type = int, help = 'observation feature dimension', required = False, default = 512)
     parser.add_argument('--hidden_dim', action = 'store', type = int, help = 'hidden dimension', required = False, default = 512)
