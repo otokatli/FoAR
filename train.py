@@ -19,7 +19,7 @@ from utils.training import set_seed, plot_history, sync_loss
 
 
 default_args = edict({
-    "data_path": "data/wiping",
+    "data_path": "data/wipe",
     "aug": False,
     "aug_jitter": False,
     "num_obs_force": 100,
@@ -36,7 +36,7 @@ default_args = edict({
     "dim_feedforward": 2048,
     "dropout": 0.1,
     "alpha": 10.0,
-    "ckpt_dir": "logs/wiping",
+    "ckpt_dir": "logs/wipe",
     "resume_ckpt": None,
     "resume_epoch": -1,
     "lr": 3e-4,
@@ -92,8 +92,8 @@ def train(args_override):
         num_obs_force = args.num_obs_force,
         num_action = args.num_action,
         num_action_force = args.num_action_force,
-        force_threshold = args.demo_force_threshold,
-        torque_threshold = args.demo_torque_threshold,
+        demo_force_threshold = args.demo_force_threshold,
+        demo_torque_threshold = args.demo_torque_threshold,
         voxel_size = args.voxel_size,
         aug = args.aug,
         aug_jitter = args.aug_jitter, 
@@ -158,16 +158,17 @@ def train(args_override):
         num_steps = len(dataloader)
         pbar = tqdm(dataloader) if RANK == 0 else dataloader
         avg_loss = 0
+        avg_loss_action = 0
 
         for data in pbar:
             # forward
             cloud_coords = data['input_coords_list']
             cloud_feats = data['input_feats_list']
-            force_data = data['input_force_list'] # normalized force data
+            force_data = data['input_force'] # normalized force data
             action_data = data['action_normalized']
             cloud_feats, cloud_coords, action_data, force_data = cloud_feats.to(device), cloud_coords.to(device), action_data.to(device), force_data.to(device)
             cloud_data = ME.SparseTensor(cloud_feats, cloud_coords)
-            color_list = data['input_frame_list_normalized']
+            color_list = data['image']
             contact = data['contact']
             loss_action, loss_cls = policy(force_data, color_list, cloud_data, action_data, contact = contact, batch_size = action_data.shape[0])
             loss = loss_action + loss_cls * args.alpha
@@ -177,13 +178,16 @@ def train(args_override):
             optimizer.zero_grad()
             lr_scheduler.step()
             avg_loss += loss.item()
+            avg_loss_action += loss_action.item()
 
         avg_loss = avg_loss / num_steps
-        sync_loss(avg_loss, device)
+        avg_loss_action = avg_loss_action / num_steps
+        sync_loss(avg_loss, avg_loss_action, device)
         train_history.append(avg_loss)
 
         if RANK == 0:
             print("Train loss: {:.6f}".format(avg_loss))
+            print("Action loss: {:.6f}".format(avg_loss_action))
             if (epoch + 1) % args.save_epochs == 0:
                 torch.save(
                     policy.module.state_dict(),

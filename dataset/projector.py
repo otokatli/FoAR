@@ -1,25 +1,8 @@
 import os
 import numpy as np
 
-from transforms3d.quaternions import quat2mat
 from dataset.constants import *
-# from .. import utils
 from utils.transformation import xyz_rot_to_mat, mat_to_xyz_rot
-
-def pose_array_quat_2_matrix(pose):
-    '''transform pose array of quaternion to transformation matrix
-    Param:
-        pose:   7d vector, with t(3d) + q(4d)
-    ----------
-    Return:
-        mat:    4x4 matrix, with R,T,0,1 form
-    '''
-    mat = quat2mat([pose[3], pose[4], pose[5], pose[6]])
-
-    return np.array([[mat[0][0], mat[0][1], mat[0][2], pose[0]],
-                    [mat[1][0], mat[1][1], mat[1][2], pose[1]],
-                    [mat[2][0], mat[2][1], mat[2][2], pose[2]],
-                    [0,0,0,1]])
 
 
 class Projector:
@@ -85,7 +68,7 @@ class Projector:
         ])
         real_force_torque = force - offset
         # transform gravity to the force sensor's coordinates
-        sensor_base_mat = pose_array_quat_2_matrix(tcp[0:7]) @ np.linalg.inv(tcp2sensor_rot)
+        sensor_base_mat = xyz_rot_to_mat(tcp[0:7], rotation_rep = "quaternion") @ np.linalg.inv(tcp2sensor_rot)
         gravity = np.linalg.inv(sensor_base_mat) @ _gravity
         gravity = gravity[0:3, :].reshape(3,)
         real_force_torque[0:3] -= gravity

@@ -46,7 +46,7 @@ class RealWorldDataset(Dataset):
 
         self.path = path
         self.split = split
-        self.data_path = os.path.join(path, 'train')
+        self.data_path = os.path.join(path, split)
         self.calib_path = os.path.join(path, "calib")
         self.num_obs = num_obs
         self.num_action = num_action
@@ -66,7 +66,7 @@ class RealWorldDataset(Dataset):
         self.with_cloud = with_cloud
         
         self.all_demos = sorted(os.listdir(self.data_path))
-        # self.num_demos = len(self.all_demos)
+        self.num_demos = len(self.all_demos)
 
         self.task_names = []
         self.data_paths = []
@@ -74,24 +74,12 @@ class RealWorldDataset(Dataset):
         self.calib_timestamp = []
         self.obs_frame_ids = []
         self.action_frame_ids = []
-        self.force_torque_raw_list = []
-        self.action_force_torque_raw_list = []
-        self.tcp_base_list = []
-        self.action_tcp_base_list = []
-        self.projectors = {}
-        self.label_begin_time_list = []
-        self.label_end_time_list = []
-        train_val_filter = lambda sid: sid % 10 != 0
-        # train_val_filter = lambda sid: sid == 5
-
-        if split == 'train':
-            cur_task_ids = [tid for tid in self.all_demos if train_val_filter(int(tid[26:30]))] 
-        elif split == 'val':
-            cur_task_ids = [tid for tid in self.all_demos if not train_val_filter(int(tid[26:30]))]
+        self.high_freq_data = []
         
-        self.num_demos = len(cur_task_ids)
+        self.projectors = {}
+        
         for i in range(self.num_demos):
-            demo_path = os.path.join(self.data_path, cur_task_ids[i])
+            demo_path = os.path.join(self.data_path, self.all_demos[i])
             for cam_id in cam_ids:
                 # path
                 cam_path = os.path.join(demo_path, "cam_{}".format(cam_id))
@@ -110,20 +98,13 @@ class RealWorldDataset(Dataset):
                 with open(os.path.join(demo_path, "timestamp.txt"), "r") as f:
                     calib_timestamp = f.readline().rstrip()
                 # get samples according to num_obs and num_action
+
                 obs_frame_ids_list = []
                 action_frame_ids_list = []
-                padding_mask_list = []
-                force_torque_raw_list = []
-                action_force_torque_raw_list = []
-                tcp_base_list = []
-                action_tcp_base_list = []
+                high_freq_data_list = []
 
                 force_torque_tcp_joint_timestamp = np.load(os.path.join(demo_path, 'high_freq_data', 'force_torque_tcp_joint_timestamp.npy'))
                 high_freq_timestamp = force_torque_tcp_joint_timestamp[:, -1]
-                force_torque_raw_data = force_torque_tcp_joint_timestamp[:, :6]
-                tcp_base_data = force_torque_tcp_joint_timestamp[:, 6:13]
-                
-                scene_id = int(cur_task_ids[i][26:30])
 
                 for cur_idx in range(len(frame_ids) - 1):
                     obs_pad_before = max(0, num_obs - cur_idx - 1)
@@ -132,37 +113,22 @@ class RealWorldDataset(Dataset):
                     frame_end = min(len(frame_ids), cur_idx + num_action + 1)
                     obs_frame_ids = frame_ids[:1] * obs_pad_before + frame_ids[frame_begin: cur_idx + 1]
                     action_frame_ids = frame_ids[cur_idx + 1: frame_end] + frame_ids[-1:] * action_pad_after
-                    obs_frame_ids_list.append(obs_frame_ids)
-                    action_frame_ids_list.append(action_frame_ids)
-                    # get force and tcp data
                     cur_idx_force = np.argmin(np.abs(high_freq_timestamp - frame_ids[cur_idx]))
                     obs_force_pad_before = max(0, num_obs_force - cur_idx_force - 1)
-                    action_force_pad_after = max(0, num_action_force-(len(force_torque_raw_data) - 1 - cur_idx_force))
+                    action_force_pad_after = max(0, num_action_force - (len(high_freq_timestamp) - 1 - cur_idx_force))
                     frame_begin_force = max(0, cur_idx_force - num_obs_force + 1)
-                    frame_end_force = min(len(force_torque_raw_data), cur_idx_force + num_action_force + 1)
-                    force_torque = np.concatenate([np.repeat(force_torque_raw_data[:1], obs_force_pad_before, axis=0), force_torque_raw_data[frame_begin_force: cur_idx_force + 1]], axis=0)
-                    action_force_torque = np.concatenate([force_torque_raw_data[cur_idx_force + 1: frame_end_force], np.repeat(force_torque_raw_data[-1:], action_force_pad_after, axis=0)], axis=0)
-                    tcp_base = np.concatenate([np.repeat(tcp_base_data[:1], obs_force_pad_before, axis=0), tcp_base_data[frame_begin_force: cur_idx_force + 1]], axis=0)
-                    action_tcp_base = np.concatenate([tcp_base_data[cur_idx_force + 1: frame_end_force], np.repeat(tcp_base_data[-1:], action_force_pad_after, axis=0)], axis=0)
-                    force_torque = np.array(force_torque).astype(np.float32)
-                    action_force_torque = np.array(action_force_torque).astype(np.float32)
-                    tcp_base = np.array(tcp_base).astype(np.float32)
-                    action_tcp_base = np.array(action_tcp_base).astype(np.float32)
-                    force_torque_raw_list.append(force_torque)
-                    action_force_torque_raw_list.append(action_force_torque)
-                    tcp_base_list.append(tcp_base)
-                    action_tcp_base_list.append(action_tcp_base)
+                    frame_end_force = min(len(high_freq_timestamp), cur_idx_force + num_action_force + 1)
+                    obs_frame_ids_list.append(obs_frame_ids)
+                    action_frame_ids_list.append(action_frame_ids)
+                    high_freq_data_list.append([cur_idx_force, frame_begin_force, frame_end_force, obs_force_pad_before, action_force_pad_after])
 
-                self.task_names += [cur_task_ids[i]] * len(obs_frame_ids_list)
+                self.task_names += [self.all_demos[i]] * len(obs_frame_ids_list)
                 self.data_paths += [demo_path] * len(obs_frame_ids_list)
                 self.cam_ids += [cam_id] * len(obs_frame_ids_list)
                 self.calib_timestamp += [calib_timestamp] * len(obs_frame_ids_list)
                 self.obs_frame_ids += obs_frame_ids_list
                 self.action_frame_ids += action_frame_ids_list
-                self.force_torque_raw_list += force_torque_raw_list
-                self.action_force_torque_raw_list += action_force_torque_raw_list
-                self.tcp_base_list += tcp_base_list
-                self.action_tcp_base_list += action_tcp_base_list
+                self.high_freq_data += high_freq_data_list
 
         
     def __len__(self):
@@ -236,6 +202,7 @@ class RealWorldDataset(Dataset):
         calib_timestamp = self.calib_timestamp[index]
         obs_frame_ids = self.obs_frame_ids[index]
         action_frame_ids = self.action_frame_ids[index]
+        cur_idx_force, frame_begin_force, frame_end_force, obs_force_pad_before, action_force_pad_after = self.high_freq_data[index]
 
         # directories
         color_dir = os.path.join(data_path, "cam_{}".format(cam_id), 'color')
@@ -244,13 +211,10 @@ class RealWorldDataset(Dataset):
         gripper_dir = os.path.join(data_path, "cam_{}".format(cam_id), 'gripper_command')
 
         # load camera projector by calib timestamp
-        timestamp_path = os.path.join(data_path, 'timestamp.txt')
-        with open(timestamp_path, 'r') as f:
-            timestamp = f.readline().rstrip()
-        if timestamp not in self.projectors:
+        if calib_timestamp not in self.projectors:
             # create projector cache
-            self.projectors[timestamp] = Projector(os.path.join(self.calib_path, timestamp))
-        projector = self.projectors[timestamp]
+            self.projectors[calib_timestamp] = Projector(os.path.join(self.calib_path, calib_timestamp))
+        projector = self.projectors[calib_timestamp]
 
         # create color jitter
         if self.split == 'train' and self.aug_jitter:
@@ -299,17 +263,21 @@ class RealWorldDataset(Dataset):
         action_tcps = np.stack(action_tcps)
         action_grippers = np.stack(action_grippers)
 
-        # obs force torque data
-        obs_force_torque_list = self.force_torque_raw_list[index].astype(np.float32)
-        tcp_base_list = self.tcp_base_list[index].astype(np.float32)
-        obs_force_torque_cam_list = [projector.project_force_to_camera_coord(tcp, force, cam_id) for tcp, force in zip(tcp_base_list, obs_force_torque_list)]
-        obs_force_torque_cam_list = np.array(obs_force_torque_cam_list).astype(np.float32)
-        obs_force_torque_std = np.std(obs_force_torque_cam_list, axis = 0)
-        action_force_torque_list = self.action_force_torque_raw_list[index].astype(np.float32)
+        # high-frequency obs force torque data
+        force_torque_tcp_joint_timestamp = np.load(os.path.join(data_path, 'high_freq_data', 'force_torque_tcp_joint_timestamp.npy'))
+        force_torque_raw_data = force_torque_tcp_joint_timestamp[:, :6]
+        tcp_base_data = force_torque_tcp_joint_timestamp[:, 6:13]
 
+        obs_force_torque = np.concatenate([np.repeat(force_torque_raw_data[:1], obs_force_pad_before, axis = 0), force_torque_raw_data[frame_begin_force: cur_idx_force + 1]], axis = 0).astype(np.float32)
+        action_force_torque = np.concatenate([force_torque_raw_data[cur_idx_force + 1: frame_end_force], np.repeat(force_torque_raw_data[-1:], action_force_pad_after, axis = 0)], axis = 0).astype(np.float32)
+        tcp_base = np.concatenate([np.repeat(tcp_base_data[:1], obs_force_pad_before, axis = 0), tcp_base_data[frame_begin_force: cur_idx_force + 1]], axis = 0)
+        
+        obs_force_torque_cam = np.array([projector.project_force_to_camera_coord(tcp, force, cam_id) for tcp, force in zip(tcp_base, obs_force_torque)]).astype(np.float32)
+        obs_force_torque_std = np.std(obs_force_torque_cam, axis = 0)
+        
         # point augmentations
         if self.split == 'train' and self.aug:
-            clouds, action_tcps, obs_force_torque_cam_list = self._augmentation(clouds, action_tcps, obs_force_torque_cam_list)
+            clouds, action_tcps, obs_force_torque_cam = self._augmentation(clouds, action_tcps, obs_force_torque_cam)
         
         # rotation transformation (to 6d)
         action_tcps = xyz_rot_transform(action_tcps, from_rep = "quaternion", to_rep = "rotation_6d")
@@ -329,13 +297,13 @@ class RealWorldDataset(Dataset):
             input_feats_list.append(cloud.astype(np.float32))
 
         # normalize force torque
-        obs_force_torque_cam_normalized = self._normalize_force(obs_force_torque_cam_list.copy())
+        obs_force_torque_cam_normalized = self._normalize_force(obs_force_torque_cam.copy())
 
         # convert to torch
         actions = torch.from_numpy(actions).float()
         actions_normalized = torch.from_numpy(actions_normalized).float()
         
-        obs_force_torque_cam_list = torch.from_numpy(obs_force_torque_cam_list).float()
+        obs_force_torque_cam = torch.from_numpy(obs_force_torque_cam).float()
         obs_force_torque_cam_normalized = torch.from_numpy(obs_force_torque_cam_normalized).float()
         obs_force_torque_std = torch.from_numpy(obs_force_torque_std).float()
 
@@ -348,10 +316,10 @@ class RealWorldDataset(Dataset):
             T.Normalize(mean = IMG_MEAN, std = IMG_STD)
         ])
         color_list_normalized = img_process(colors_list)
-        obs_force_value = np.sqrt(np.sum(obs_force_torque_list[:, :3] ** 2, axis = -1))
-        obs_torque_value = np.sqrt(np.sum(obs_force_torque_list[:, 3:] ** 2, axis = -1))
-        action_force_value = np.sqrt(np.sum(action_force_torque_list[:, :3] ** 2, axis = -1))
-        action_torque_value = np.sqrt(np.sum(action_force_torque_list[:, 3:] ** 2, axis = -1))
+        obs_force_value = np.sqrt(np.sum(obs_force_torque[:, :3] ** 2, axis = -1))
+        obs_torque_value = np.sqrt(np.sum(obs_force_torque[:, 3:] ** 2, axis = -1))
+        action_force_value = np.sqrt(np.sum(action_force_torque[:, :3] ** 2, axis = -1))
+        action_torque_value = np.sqrt(np.sum(action_force_torque[:, 3:] ** 2, axis = -1))
 
         # label by force threshold
         contact_force = np.max(obs_force_value) > self.demo_force_threshold or np.max(action_force_value) > self.demo_force_threshold
@@ -361,17 +329,12 @@ class RealWorldDataset(Dataset):
         ret_dict = {
             'input_coords_list': input_coords_list,
             'input_feats_list': input_feats_list,
-            'input_force_list': obs_force_torque_cam_normalized,
-            'input_force_list_std': obs_force_torque_std,
-
-            'input_frame_list': colors_list, # (..., 3, 720, 1280)
-            'input_frame_list_normalized': color_list_normalized, # (..., 3, 224, 224)
+            'input_force': obs_force_torque_cam_normalized,
+            'input_force_std': obs_force_torque_std,
+            'image': color_list_normalized, # (..., 3, 224, 224)
             'contact': contact,
-
             'action': actions,
-            'action_normalized': actions_normalized,
-            'curr_timestamp': obs_frame_ids[-1],
-            'task_name': self.task_names[index],
+            'action_normalized': actions_normalized
         }
         
         if self.with_cloud:  # warning: this may significantly slow down the training process.

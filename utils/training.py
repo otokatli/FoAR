@@ -20,9 +20,9 @@ def plot_history(train_history, num_epochs, ckpt_dir, seed):
     plt.savefig(os.path.join(ckpt_dir, f'train_seed_{seed}.png'))
 
 
-def sync_loss(loss, device):
-    t = [loss]
+def sync_loss(loss, loss_action, device):
+    t = [loss, loss_action]
     t = torch.tensor(t, dtype = torch.float64, device = device)
-    # dist.barrier()
-    # dist.all_reduce(t, op = torch.distributed.ReduceOp.AVG)
-    return t[0]
+    dist.barrier()
+    dist.all_reduce(t, op = torch.distributed.ReduceOp.AVG)
+    return t

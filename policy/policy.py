@@ -85,7 +85,7 @@ class FoAR(nn.Module):
         if actions is not None:
             loss_action = self.action_decoder.compute_loss(combined_readout, actions)
             prop = prop.squeeze()
-            loss_cls = self.classifier_criterion(prop, contact)
+            loss_cls = self.classifier_criterion(prop, contact.float())
             return loss_action, loss_cls
         else:
             with torch.no_grad():
