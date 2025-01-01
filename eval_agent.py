@@ -72,13 +72,13 @@ class Agent:
         return self.sensor.getHistory()
 
     def get_force_torque(self):
-        return self.sensor.getHistory()[-1]
+        return self.get_force_torque_history()[-1]
 
     def get_force(self):
-        return self.sensor.getHistory()[-1, :3]
+        return self.get_force_torque()[:3]
     
     def get_torque(self):
-        return self.sensor.getHistory()[-1, 3:]  
+        return self.get_force_torque()[3:]  
     
     def get_force_torque_value(self):
         ft = self.get_force_torque()

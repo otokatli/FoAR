@@ -17,7 +17,48 @@ We use [RISE](https://rise-policy.github.io/) as our real robot baseline, Please
 Please calibrate the camera(s) with the robot before data collection and evaluation to ensure correct spatial transformations between camera(s) and the robot. Please refer to [calibration guide](assets/docs/CALIB.md) for more details.
 
 ### 🛢️ Data Collection
-Data will be released soon.
+
+We apply the data collection process in the <a href="https://rh20t.github.io/">RH20T</a> paper. You may need to adjust `dataset/realworld.py` to accommodate different data formats. The sample data have the format of
+
+```
+collect_cups
+|-- calib/
+|   |-- [calib timestamp 1]/
+|   |   |-- extrinsics.npy             # extrinsics (camera to marker)
+|   |   |-- intrinsics.npy             # intrinsics
+|   |   `-- tcp.npy                    # tcp pose of calibration
+|   `-- [calib timestamp 2]/           # similar calib structure
+`-- train/
+    |-- [episode identifier 1]
+    |   |-- metadata.json              # metadata
+    |   |-- timestamp.txt              # calib timestamp
+    |   |-- high_freq_data/            # high frequency data
+    |   |   `-- force_torque_tcp_joint_timestamp.npy
+    |   |                              # force/torque, tcp, joint, timestamp data
+    |   |-- cam_[serial_number 1]/    
+    |   |   |-- color                  # RGB
+    |   |   |   |-- [timestamp 1].png
+    |   |   |   |-- [timestamp 2].png
+    |   |   |   |-- ...
+    |   |   |   `-- [timestamp T].png
+    |   |   |-- depth                  # depth
+    |   |   |   |-- [timestamp 1].png
+    |   |   |   |-- [timestamp 2].png
+    |   |   |   |-- ...
+    |   |   |   `-- [timestamp T].png
+    |   |   |-- tcp                    # tcp
+    |   |   |   |-- [timestamp 1].npy
+    |   |   |   |-- [timestamp 2].npy
+    |   |   |   |-- ...
+    |   |   |   `-- [timestamp T].npy
+    |   |   `-- gripper_command        # gripper command
+    |   |       |-- [timestamp 1].npy
+    |   |       |-- [timestamp 2].npy
+    |   |       |-- ...
+    |   |       `-- [timestamp T].npy
+    |   `-- cam_[serial_number 2]/     # similar camera structure
+    `-- [episode identifier 2]         # similar episode structure
+```
 
 ### 🧑🏻‍💻 Training
 The training scripts are saved in [script](script).
@@ -29,7 +70,7 @@ bash script/command_train.sh # Train Foar policy
 
 ### 🤖 Evaluation
 
- Please follow the [deployment guide](assets/docs/DEPLOY.md) to modify the evaluation script.
+Please follow the [deployment guide](assets/docs/DEPLOY.md) to modify the evaluation script.
 
 Modify the arguments in `script/command_eval.sh`, then
 
