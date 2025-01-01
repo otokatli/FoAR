@@ -273,7 +273,6 @@ class RealWorldDataset(Dataset):
         tcp_base = np.concatenate([np.repeat(tcp_base_data[:1], obs_force_pad_before, axis = 0), tcp_base_data[frame_begin_force: cur_idx_force + 1]], axis = 0)
         
         obs_force_torque_cam = np.array([projector.project_force_to_camera_coord(tcp, force, cam_id) for tcp, force in zip(tcp_base, obs_force_torque)]).astype(np.float32)
-        obs_force_torque_std = np.std(obs_force_torque_cam, axis = 0)
         
         # point augmentations
         if self.split == 'train' and self.aug:
@@ -305,8 +304,6 @@ class RealWorldDataset(Dataset):
         
         obs_force_torque_cam = torch.from_numpy(obs_force_torque_cam).float()
         obs_force_torque_cam_normalized = torch.from_numpy(obs_force_torque_cam_normalized).float()
-        obs_force_torque_std = torch.from_numpy(obs_force_torque_std).float()
-
 
         if self.num_obs == 1:
             colors_list = colors_list[0]
@@ -330,7 +327,6 @@ class RealWorldDataset(Dataset):
             'input_coords_list': input_coords_list,
             'input_feats_list': input_feats_list,
             'input_force': obs_force_torque_cam_normalized,
-            'input_force_std': obs_force_torque_std,
             'image': color_list_normalized, # (..., 3, 224, 224)
             'contact': contact,
             'action': actions,
