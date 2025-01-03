@@ -207,7 +207,7 @@ def evaluate(args_override):
     with torch.inference_mode():
         force_policy.eval()
         prev_width = None
-        for t in args.max_timesteps:
+        for t in range(args.max_steps):
             if t % args.num_inference_step == 0 :
                 # pre-process inputs
                 colors, depths = agent.get_observation()
@@ -267,7 +267,9 @@ def evaluate(args_override):
             
             if prop < args.cls_threshold:
                 step_action = ensemble_buffer.get_action()
-            else:
+                force_ensemble_buffer.get_action()
+            else: 
+                ensemble_buffer.get_action()
                 step_action = force_ensemble_buffer.get_action()
                 
             if step_action is None:   # no action in the buffer => no movement.
