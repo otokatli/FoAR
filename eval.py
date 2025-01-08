@@ -262,7 +262,6 @@ def evaluate(args_override):
                     if cur_force_value < args.force_threshold and cur_torque_value < args.torque_threshold: # reactive control
                         distance = np.mean(action[:args.num_motion_calc_steps, :3], axis=0) - agent.get_tcp_pose()[:3]
                         unit_distance = distance / np.linalg.norm(distance)
-                        # action[:, :3] = agent.get_tcp_pose()[:3] + unit_distance * args.epsilon
                         action[:, :3] = action[:, :3] + unit_distance * args.epsilon
                         force_ensemble_buffer.add_action(action, t)
             
