@@ -232,7 +232,7 @@ def evaluate(args_override):
                 force_torque_normalized = force_torque_normalized.unsqueeze(0).to(device)
                 color_list = img_process(colors).unsqueeze(0).to(device)
                 # FoAR
-                prop, pred_raw_action = force_policy(force_torque_normalized, color_list, cloud_data, actions = None,is_cut=None, batch_size = 1)
+                prop, pred_raw_action = force_policy(force_torque_normalized, color_list, cloud_data, actions = None, contact=None, batch_size = 1)
                 pred_raw_action = pred_raw_action.squeeze(0).cpu().numpy()
 
                 # unnormalize predicted actions
@@ -262,7 +262,8 @@ def evaluate(args_override):
                     if cur_force_value < args.force_threshold and cur_torque_value < args.torque_threshold: # reactive control
                         distance = np.mean(action[:args.num_motion_calc_steps, :3], axis=0) - agent.get_tcp_pose()[:3]
                         unit_distance = distance / np.linalg.norm(distance)
-                        action[:, :3] = agent.get_tcp_pose()[:3] + unit_distance * args.epsilon
+                        # action[:, :3] = agent.get_tcp_pose()[:3] + unit_distance * args.epsilon
+                        action[:, :3] = action[:, :3] + unit_distance * args.epsilon
                         force_ensemble_buffer.add_action(action, t)
             
             if prop < args.cls_threshold:
@@ -326,7 +327,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_decoder_layers', action = 'store', type = int, help = 'number of decoder layers', required = False, default = 1)
     parser.add_argument('--dim_feedforward', action = 'store', type = int, help = 'feedforward dimension', required = False, default = 2048)
     parser.add_argument('--dropout', action = 'store', type = float, help = 'dropout ratio', required = False, default = 0.1)
-    parser.add_argument('--max_steps', action = 'store', type = int, help = 'max steps for evaluation', required = False, default = 300)
+    parser.add_argument('--max_timesteps', action = 'store', type = int, help = 'max steps for evaluation', required = False, default = 300)
     parser.add_argument('--seed', action = 'store', type = int, help = 'seed', required = False, default = 233)
     parser.add_argument('--vis', action = 'store_true', help = 'add visualization during evaluation')
     parser.add_argument('--discretize_rotation', action = 'store_true', help = 'whether to discretize rotation process.')
