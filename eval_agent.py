@@ -68,8 +68,8 @@ class Agent:
         colors, depths = self.camera.get_rgbd_image()
         return colors, depths
     
-    def get_force_torque_history(self):
-        return self.sensor.getHistory()
+    def get_force_torque_history(self, freq = 100):
+        return self.sensor.getHistoryfreq(freq=freq)
 
     def get_force_torque(self):
         return self.get_force_torque_history()[-1]

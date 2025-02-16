@@ -29,6 +29,7 @@ default_args = edict({
     "cls_threshold": 0.9,
     "force_threshold": 8.0,
     "torque_threshold": 5.0,
+    "force_torque_freq": 100.0,
     "epsilon": 0.006,
     "voxel_size": 0.005,
     "obs_feature_dim": 512,
@@ -222,7 +223,7 @@ def evaluate(args_override):
                 feats, coords = feats.to(device), coords.to(device)
                 cloud_data = ME.SparseTensor(feats, coords)
                 tcp = agent.get_tcp_pose()
-                force_torque_base = agent.get_force_torque_history()
+                force_torque_base = agent.get_force_torque_history(freq=args.force_torque_freq)
                 force_torque_cam = []
                 for i in range(args.num_obs_force):
                     force_torque_cam.append(projector.project_force_to_camera_coord(tcp, force_torque_base[i], cam="750612070851"))
@@ -317,6 +318,7 @@ if __name__ == '__main__':
     parser.add_argument('--cls_threshold', action = 'store', type = float, help = 'threshold for future contact probability', required = False, default = 0.9)
     parser.add_argument('--force_threshold', action = 'store', type = float, help = 'force threshold', required = False, default = 8.0)
     parser.add_argument('--torque_threshold', action = 'store', type = float, help = 'torque threshold', required = False, default = 5.0)
+    parser.add_argument('--force_torque_freq', action = 'store', type = float, help = 'force torque freq', required = False, default = 100.0)
     parser.add_argument('--epsilon', action = 'store', type = int, help = 'epsilon for reactive control', required = False, default = 0.006)
     parser.add_argument('--voxel_size', action = 'store', type = float, help = 'voxel size', required = False, default = 0.005)
     parser.add_argument('--obs_feature_dim', action = 'store', type = int, help = 'observation feature dimension', required = False, default = 512)

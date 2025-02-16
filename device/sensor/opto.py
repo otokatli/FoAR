@@ -349,6 +349,22 @@ class OptoForceFTSensorWithHistory(OptoForceFTSensor):
         '''
         return np.array(self.history)
 
+    def getHistoryfreq(self, freq = 100):
+        '''
+        get history of force and torque value with a given frequency
+
+        Parameters
+        ----------
+        freq: int, optional, default: 100, the frequency of the history.
+        
+        Returns
+        -------
+        np.array of float: history of force and torque value with a given frequency
+        '''
+        step = int(100.0 / freq)
+        return np.array(self.history)[::step]
+
+
     def stop_streaming(self):
         '''
         Stop streaming process.
