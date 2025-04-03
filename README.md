@@ -2,7 +2,7 @@
 
 [[Paper]](https://arxiv.org/pdf/2411.15753) [[Project Page]](https://tonyfang.net/FoAR/)
 
-**Authors**: [Zihao He*](https://github.com/Alan-Heoooh), [Hongjie Fang*](https://tonyfang.net/), [Jingjing Chen](mailto:jjchen20@sjtu.edu), [Hao-Shu Fang](https://fang-haoshu.github.io/), [Cewu Lu](https://www.mvig.org/)
+**Authors**: [Zihao He*](https://alan-heoooh.github.io/), [Hongjie Fang*](https://tonyfang.net/), [Jingjing Chen](mailto:jjchen20@sjtu.edu), [Hao-Shu Fang](https://fang-haoshu.github.io/), [Cewu Lu](https://www.mvig.org/)
 
 ![teaser](assets/images/teaser.png)
 
