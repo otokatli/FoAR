@@ -45,7 +45,7 @@ Please follow the instructions to install the conda environments and the depende
 - Flexiv Rizon 4 Robotic Arm (or other robotic arms)
 - Dahuan AG-95 Gripper (or other grippers)
 - Intel RealSense RGB-D Camera (D415/D435/L515)
-- OptoForce force/orque sensor
+- OptoForce force/torque sensor
 
 **Softwares**.
 - Ubuntu 20.04 (tested) with previous environment installed.
