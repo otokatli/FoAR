@@ -82,12 +82,15 @@ bash script/command_eval.sh
 ## ✍️ Citation
 
 ```bibtex
-@article{
-  he2024force,
-  title = {FoAR: Force-Aware Reactive Policy for Contact-Rich Robotic Manipulation},
-  author = {He, Zihao and Fang, Hongjie and Chen, Jingjing and Fang, Hao-Shu and Lu, Cewu},
-  journal = {arXiv preprint arXiv:2411.15753},
-  year = {2024}
-}
+@ARTICLE{10964857,
+  author={He, Zihao and Fang, Hongjie and Chen, Jingjing and Fang, Hao-Shu and Lu, Cewu},
+  journal={IEEE Robotics and Automation Letters}, 
+  title={FoAR: Force-Aware Reactive Policy for Contact-Rich Robotic Manipulation}, 
+  year={2025},
+  volume={10},
+  number={6},
+  pages={5625-5632},
+  keywords={Robots;Robot sensing systems;Force;Point cloud compression;Dynamics;Sensors;Visualization;Transformers;Noise measurement;Training;Force and tactile sensing;imitation learning;perception for grasping and manipulation},
+  doi={10.1109/LRA.2025.3560871}}
 ```
 
