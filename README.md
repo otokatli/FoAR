@@ -18,7 +18,7 @@ Please calibrate the camera(s) with the robot before data collection and evaluat
 
 ### 🛢️ Data Collection
 
-We apply the data collection process in the <a href="https://rh20t.github.io/">RH20T</a> paper. You may need to adjust `dataset/realworld.py` to accommodate different data formats. The sample data of peeling and wiping tasks can be found <a href="https://drive.google.com/drive/folders/1H-cJoCjn-kHAKxwhlwX3FH6ztoo8Vl5r?usp=sharing">here</a>, which have the format of
+We apply the data collection process in the <a href="https://rh20t.github.io/">RH20T</a> paper. You may need to adjust `dataset/realworld.py` to accommodate different data formats. The sample data of peeling and wiping tasks can be found <a href="https://drive.google.com/drive/folders/1Tq7wR9MdLLFr5AZTqXvypF2_2CJ-ghd5?usp=sharing">here</a>, which have the format of
 
 ```
 peel
