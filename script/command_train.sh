@@ -7,7 +7,7 @@ export NCCL_DEBUG=WARN
 torchrun \
   --master_addr=127.0.0.1 \
   --master_port=10001 \
-  --nproc_per_node=2 \
+  --nproc_per_node=1 \
   --nnodes=1 \
   --node_rank=0 \
   train.py \
@@ -27,7 +27,7 @@ torchrun \
   --dim_feedforward 2048 \
   --dropout 0.1 \
   --ckpt_dir logs/wipe \
-  --batch_size 240 \
+  --batch_size 64 \
   --num_epochs 1000 \
   --save_epochs 100 \
   --num_workers 8 \
